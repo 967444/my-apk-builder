@@ -10,8 +10,7 @@ const JAVA_HOME = process.env.JAVA_HOME || '/usr/lib/jvm/java-17-openjdk-amd64';
 const BUILD_TIMEOUT_MS = Number(process.env.BUILD_TIMEOUT_MS || 20 * 60 * 1000);
 const MAX_CONCURRENT_BUILDS = Number(process.env.MAX_CONCURRENT_BUILDS || 2);
 const MAX_ARCHIVE_ENTRIES = Number(process.env.MAX_ARCHIVE_ENTRIES || 30000);
-const MIRROR_INIT_SCRIPT = path.join(__dirname, '..', 'gradle', 'mirror.init.gradle');
-
+const MIRROR_INIT_SCRIPT = path.join(__dirname, 'mirror.init.gradle');
 const builds = new Map();
 const queue = [];
 let running = 0;
