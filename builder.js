@@ -190,7 +190,6 @@ async function execute(build) {
     const code = await run(
       build,
       useWrapper ? './gradlew' : 'gradle',
-      [
         [
         task,
         '--no-daemon',
@@ -201,7 +200,7 @@ async function execute(build) {
         '-Dorg.gradle.internal.repository.max.retries=10',
         '-Dorg.gradle.internal.repository.initial.backoff=3000',
       ],
-        
+            validation.root
     );
     if (code !== 0) throw new Error(`Gradle exited with code ${code}. Check the log above for "What went wrong".`);
 
