@@ -191,15 +191,17 @@ async function execute(build) {
       build,
       useWrapper ? './gradlew' : 'gradle',
       [
+        [
         task,
         '--no-daemon',
-        '--max-workers=2',
+        '--max-workers=1',
+        '-Dorg.gradle.jvmargs=-Xmx384m -XX:+UseSerialGC',
         '--init-script',
         MIRROR_INIT_SCRIPT,
         '-Dorg.gradle.internal.repository.max.retries=10',
         '-Dorg.gradle.internal.repository.initial.backoff=3000',
       ],
-      validation.root
+        
     );
     if (code !== 0) throw new Error(`Gradle exited with code ${code}. Check the log above for "What went wrong".`);
 
