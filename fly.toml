@@ -1,0 +1,26 @@
+app = "apk-builder"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  WORK_ROOT = "/data"
+  MAX_ZIP_MB = "500"
+  BUILD_TIMEOUT_MS = "1200000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[mounts]]
+  source = "apk_builder_data"
+  destination = "/data"
+
+[[vm]]
+  size = "performance-2x"
+  memory = "4gb"

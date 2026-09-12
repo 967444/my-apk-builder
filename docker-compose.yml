@@ -1,0 +1,20 @@
+services:
+  apk-builder:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      WORK_ROOT: /data
+      MAX_ZIP_MB: "500"
+      BUILD_TIMEOUT_MS: "1200000"
+      # Uncomment if the host is rate-limited by Maven Central (HTTP 429)
+      # MAVEN_CENTRAL_MIRROR: https://maven-central.storage-download.googleapis.com/maven2/
+    volumes:
+      - builder-data:/data
+      - gradle-cache:/opt/gradle-home
+    restart: unless-stopped
+
+volumes:
+  builder-data:
+  gradle-cache:

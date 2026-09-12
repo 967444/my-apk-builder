@@ -1,0 +1,45 @@
+// Redirects Maven Central lookups to a mirror when MAVEN_CENTRAL_MIRROR is set.
+// Useful on hosts where repo.maven.apache.org rate-limits (HTTP 429).
+def mirror = System.getenv('MAVEN_CENTRAL_MIRROR')
+if (mirror) {
+    def centralHosts = [
+        'https://repo.maven.apache.org/maven2',
+        'https://repo1.maven.org/maven2',
+        'http://repo.maven.apache.org/maven2',
+        'http://repo1.maven.org/maven2',
+    ]
+
+    def rewrite = { RepositoryHandler handler ->
+        handler.all { repo ->
+            if (repo instanceof MavenArtifactRepository) {
+                def current = repo.url.toString().replaceAll('/$', '')
+                if (centralHosts.contains(current)) {
+                    repo.url = mirror
+                }
+            }
+        }
+    }
+
+    def addMirrorFirst = { RepositoryHandler handler ->
+        def repo = handler.maven {
+            name = 'mavenCentralMirror'
+            url = mirror
+        }
+        handler.remove(repo)
+        handler.addFirst(repo)
+    }
+
+    settingsEvaluated { settings ->
+        rewrite(settings.pluginManagement.repositories)
+        rewrite(settings.dependencyResolutionManagement.repositories)
+        addMirrorFirst(settings.pluginManagement.repositories)
+        if (!settings.dependencyResolutionManagement.repositories.isEmpty()) {
+            addMirrorFirst(settings.dependencyResolutionManagement.repositories)
+        }
+    }
+
+    allprojects {
+        rewrite(buildscript.repositories)
+        rewrite(repositories)
+    }
+}

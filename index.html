@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ZIP → APK Builder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233ddc84'/><text x='50' y='68' font-size='52' text-anchor='middle' font-family='sans-serif' font-weight='700' fill='%230b1220'>A</text></svg>" />
+<style>
+  :root {
+    --bg: #0b1020; --bg2: #101731; --panel: #151d38; --panel2: #1b2447; --line: #263159;
+    --text: #e6ebff; --muted: #97a3c9; --accent: #3ddc84; --accent2: #6ea8ff; --warn: #ffb74d; --err: #ff6b6b;
+    --radius: 14px; --shadow: 0 10px 40px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(1200px 600px at 10% -10%, #1a2a5a 0%, var(--bg) 55%), var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  a { color: var(--accent2); }
+  button { font: inherit; cursor: pointer; }
+  input, select { font: inherit; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 26px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .logo { width: 46px; height: 46px; border-radius: 13px; background: var(--accent); display: grid; place-items: center; font-weight: 800; color: #0b1220; font-size: 24px; }
+  .brand h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
+  .brand p { margin: 0; color: var(--muted); font-size: 13px; }
+  .tool { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .chip b { color: var(--text); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+  .dot.bad { background: var(--err); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; }
+  @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+  .step .n { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .step.active { border-color: var(--accent); color: var(--text); }
+  .step.active .n { background: var(--accent); color: #0b1220; border-color: var(--accent); }
+  .step.done .n { background: var(--panel2); color: var(--accent); border-color: var(--accent); }
+  @media (max-width: 700px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); }
+  .card + .card { margin-top: 18px; }
+  .card h2 { margin: 0 0 4px; font-size: 18px; }
+  .card .sub { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 34px 20px; text-align: center; background: var(--bg2); transition: .15s; cursor: pointer; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: #12203d; }
+  .drop .big { font-size: 40px; }
+  .drop p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .file-pill { margin-top: 14px; display: none; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel2); padding: 10px 14px; border-radius: 10px; }
+  .file-pill.show { display: flex; }
+  .file-pill small { color: var(--muted); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  label.f { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  label.f b { color: var(--text); font-weight: 600; }
+  .in { width: 100%; background: var(--bg2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; outline: none; transition: .15s; }
+  .in:focus { border-color: var(--accent2); }
+  .in.bad { border-color: var(--err); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .hint.err { color: var(--err); }
+
+  .icon-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .icon-preview { width: 108px; height: 108px; border-radius: 26px; background: var(--bg2); border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 12px; text-align: center; }
+  .icon-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .phone-preview { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 90px; }
+  .phone-preview .ico { width: 56px; height: 56px; border-radius: 16px; overflow: hidden; background: var(--bg2); border: 1px solid var(--line); }
+  .phone-preview .ico img { width: 100%; height: 100%; object-fit: cover; }
+  .phone-preview span { font-size: 11px; color: var(--text); text-align: center; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .btn { border: 1px solid var(--line); background: var(--panel2); color: var(--text); padding: 10px 16px; border-radius: 10px; font-weight: 600; transition: .15s; }
+  .btn:hover { border-color: var(--accent2); }
+  .btn.primary { background: var(--accent); color: #0b1220; border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; }
+  .btn.sm { padding: 6px 10px; font-size: 12.5px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .toolbar .in { flex: 1; min-width: 200px; }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .preset { border-radius: 999px; padding: 6px 12px; font-size: 12.5px; background: var(--bg2); color: var(--text); border: 1px solid var(--line); }
+  .preset:hover { border-color: var(--accent); }
+  .group { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+  .group-h { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--panel2); cursor: pointer; user-select: none; }
+  .group-h h3 { margin: 0; font-size: 14px; }
+  .group-h .cnt { color: var(--muted); font-size: 12px; margin-left: 8px; }
+  .group-h .right { display: flex; gap: 8px; align-items: center; }
+  .group-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; padding: 10px; }
+  .group.collapsed .group-body { display: none; }
+  .perm { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; }
+  .perm:hover { background: var(--bg2); }
+  .perm.on { border-color: var(--accent); background: rgba(61,220,132,.06); }
+  .perm input { margin-top: 3px; accent-color: var(--accent); }
+  .perm .t { font-size: 13.5px; font-weight: 600; }
+  .perm .d { font-size: 12px; color: var(--muted); }
+  .perm .k { font-size: 11px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .badge { font-size: 10px; padding: 1px 6px; border-radius: 6px; background: rgba(255,183,77,.15); color: var(--warn); margin-left: 6px; vertical-align: middle; }
+  .selected-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .selected-bar .tag { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+  .selected-bar .tag button { background: none; border: none; color: var(--muted); padding: 0; font-size: 14px; line-height: 1; }
+
+  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; font-size: 13.5px; margin-bottom: 16px; }
+  .summary div span { display: block; color: var(--muted); font-size: 12px; }
+  @media (max-width: 640px) { .summary { grid-template-columns: 1fr; } }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { border: none; background: var(--bg2); color: var(--muted); padding: 9px 14px; }
+  .seg button.on { background: var(--accent); color: #0b1220; font-weight: 700; }
+
+  .status { display: flex; align-items: center; gap: 12px; margin: 16px 0 10px; flex-wrap: wrap; }
+  .pill { padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: var(--panel2); border: 1px solid var(--line); }
+  .pill.running { border-color: var(--accent2); color: var(--accent2); }
+  .pill.success { border-color: var(--accent); color: var(--accent); }
+  .pill.failed { border-color: var(--err); color: var(--err); }
+  .progress { height: 6px; background: var(--bg2); border-radius: 999px; overflow: hidden; margin: 6px 0 14px; }
+  .progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width .4s; }
+  .progress.indet i { width: 35%; animation: slide 1.4s infinite ease-in-out; }
+  @keyframes slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(300%);} }
+  pre.log { background: #070b17; border: 1px solid var(--line); border-radius: 12px; padding: 14px; height: 340px; overflow: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #c9d4ff; margin: 0; white-space: pre-wrap; word-break: break-word; }
+  pre.log .fix { color: var(--accent); }
+  pre.log .warn { color: var(--warn); }
+  pre.log .err { color: var(--err); }
+  .result { margin-top: 16px; padding: 16px; border-radius: 12px; background: rgba(61,220,132,.08); border: 1px solid rgba(61,220,132,.4); }
+  .result.bad { background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.4); }
+  .result h3 { margin: 0 0 8px; font-size: 16px; }
+  .dl { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg2); padding: 10px 14px; border-radius: 10px; margin-top: 8px; flex-wrap: wrap; }
+  .dl code { font-size: 12.5px; }
+
+  aside .card h2 { font-size: 15px; }
+  .hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow: auto; }
+  .hist li { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .hist li:hover { border-color: var(--accent2); }
+  .hist .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .hist .name { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 14px 0; }
+  .tc { display: grid; gap: 6px; font-size: 13px; }
+  .tc div { display: flex; justify-content: space-between; gap: 8px; }
+  .tc span { color: var(--muted); }
+  .tc b { font-weight: 600; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--err); color: var(--text); padding: 12px 18px; border-radius: 12px; box-shadow: var(--shadow); display: none; z-index: 9; max-width: 90vw; }
+  .toast.show { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>
+        <h1>ZIP → APK Builder</h1>
+        <p>Upload an Android Studio project, set name · icon · permissions, download the APK.</p>
+      </div>
+    </div>
+    <div class="tool" id="toolchain">
+      <span class="chip"><span class="dot"></span> checking toolchain…</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <main>
+      <div class="steps" id="steps">
+        <div class="step active" data-step="1"><span class="n">1</span> Upload project</div>
+        <div class="step" data-step="2"><span class="n">2</span> Name &amp; icon</div>
+        <div class="step" data-step="3"><span class="n">3</span> Permissions</div>
+        <div class="step" data-step="4"><span class="n">4</span> Build &amp; download</div>
+      </div>
+
+      <!-- STEP 1 -->
+      <section class="card pane active" data-pane="1">
+        <h2>Upload your Android Studio project</h2>
+        <p class="sub">Zip the whole project folder (the one containing <code>settings.gradle</code> / <code>app/</code>). Missing <code>local.properties</code>, <code>settings.gradle</code>, wrapper permissions and CRLF issues are fixed automatically.</p>
+        <div class="drop" id="drop">
+          <div class="big">📦</div>
+          <div><b>Drop the .zip here</b> or click to choose</div>
+          <p id="limit">Max size depends on server config</p>
+          <input type="file" id="zip" accept=".zip,application/zip" hidden />
+        </div>
+        <div class="file-pill" id="filePill">
+          <div><b id="fileName"></b><br /><small id="fileSize"></small></div>
+          <button class="btn sm ghost" id="clearZip">Remove</button>
+        </div>
+        <div class="actions">
+          <span></span>
+          <button class="btn primary" id="to2" disabled>Continue →</button>
+        </div>
+      </section>
+
+      <!-- STEP 2 -->
+      <section class="card pane" data-pane="2">
+        <h2>App name &amp; icon</h2>
+        <p class="sub">The name you enter becomes the launcher label <em>and</em> the APK file name. The icon replaces the launcher icon at every density.</p>
+        <div class="grid2">
+          <div>
+            <label class="f" for="appName"><b>App name</b> · required</label>
+            <input class="in" id="appName" maxlength="60" placeholder="e.g. My Shop" autocomplete="off" />
+            <div class="hint" id="apkNameHint">APK will be named <code>app-debug.apk</code></div>
+          </div>
+          <div>
+            <label class="f" for="packageName"><b>Package name</b> · optional</label>
+            <input class="in" id="packageName" placeholder="leave blank to keep the project's applicationId" autocomplete="off" />
+            <div class="hint">Format: <code>com.company.app</code>. Changes <code>applicationId</code> in Gradle.</div>
+          </div>
+          <div>
+            <label class="f" for="versionName"><b>Version name</b> · optional</label>
+            <input class="in" id="versionName" placeholder="e.g. 1.0.0" autocomplete="off" />
+          </div>
+          <div>
+            <label class="f" for="versionCode"><b>Version code</b> · optional</label>
+            <input class="in" id="versionCode" type="number" min="1" step="1" placeholder="e.g. 1" />
+          </div>
+        </div>
+
+        <div style="margin-top:20px">
+          <label class="f"><b>App icon</b> · optional (PNG / JPG / WebP, square, ≥ 512px recommended)</label>
+          <div class="icon-row">
+            <div class="icon-preview" id="iconPreview">No icon<br />(project default kept)</div>
+            <div class="phone-preview">
+              <div class="ico" id="phoneIco"></div>
+              <span id="phoneLabel">App name</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <input type="file" id="icon" accept="image/png,image/jpeg,image/webp" hidden />
+              <button class="btn" id="pickIcon">Choose icon…</button>
+              <button class="btn ghost sm" id="clearIcon" style="display:none">Remove icon</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn ghost" data-go="1">← Back</button>
+          <button class="btn primary" id="to3">Continue →</button>
+        </div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section class="card pane" data-pane="3">
+        <h2>Permissions</h2>
+        <p class="sub">Tick everything your app needs. Each one is added as <code>&lt;uses-permission&gt;</code> in <code>AndroidManifest.xml</code>. Runtime permissions (marked <span class="badge">runtime</span>) must still be requested in your app code.</p>
+        <div class="presets" id="presets"></div>
+        <div class="toolbar">
+          <input class="in" id="permSearch" placeholder="Search permissions… (camera, location, sms, bluetooth)" />
+          <button class="btn sm" id="expandAll">Expand all</button>
+          <button class="btn sm" id="collapseAll">Collapse all</button>
+          <button class="btn sm ghost" id="clearPerms">Clear</button>
+        </div>
+        <div id="groups"></div>
+        <div class="selected-bar" id="selectedBar"></div>
+        <div class="actions">
+          <button class="btn ghost" data-go="2">← Back</button>
+          <button class="btn primary" id="to4">Review &amp; build →</button>
+        </div>
+      </section>
+
+      <!-- STEP 4 -->
+      <section class="card pane" data-pane="4">
+        <h2>Build</h2>
+        <p class="sub">Review the configuration, pick a variant, and start the build. Logs stream live.</p>
+        <div class="summary" id="summary"></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="seg" id="variant">
+            <button class="on" data-v="debug">Debug APK</button>
+            <button data-v="release">Release APK</button>
+          </div>
+          <span class="hint" id="variantHint">Debug is signed automatically and installs on any device.</span>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" data-go="3" id="back3">← Back</button>
+          <button class="btn primary" id="buildBtn">🚀 Build APK</button>
+        </div>
+
+        <div id="buildArea" style="display:none">
+          <div class="status">
+            <span class="pill" id="statusPill">queued</span>
+            <span class="hint" id="elapsed"></span>
+          </div>
+          <div class="progress indet" id="progress"><i></i></div>
+          <pre class="log" id="log"></pre>
+          <div id="result"></div>
+        </div>
+      </section>
+    </main>
+
+    <aside>
+      <div class="card">
+        <h2>Toolchain</h2>
+        <div class="tc" id="tcDetail"><div><span>Loading…</span></div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h2 style="margin:0">Recent builds</h2>
+          <button class="btn sm ghost" id="refreshHist">↻</button>
+        </div>
+        <ul class="hist" id="hist"><li class="empty">No builds yet</li></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const fmtBytes = (n) => (n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n > 1e3 ? (n / 1e3).toFixed(0) + ' KB' : n + ' B');
+  const slug = (v) => (v || 'app').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'app';
+
+  const state = { zip: null, icon: null, iconUrl: null, perms: new Set(), variant: 'debug', step: 1, catalog: [], currentBuild: null, es: null, timer: null };
+
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 4500);
+  }
+
+  // ---------- steps ----------
+  function go(step) {
+    state.step = step;
+    $$('.pane').forEach((p) => p.classList.toggle('active', Number(p.dataset.pane) === step));
+    $$('.step').forEach((s) => {
+      const n = Number(s.dataset.step);
+      s.classList.toggle('active', n === step);
+      s.classList.toggle('done', n < step);
+    });
+    if (step === 4) renderSummary();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  $$('[data-go]').forEach((b) => b.addEventListener('click', () => go(Number(b.dataset.go))));
+  $$('.step').forEach((s) => s.addEventListener('click', () => {
+    const n = Number(s.dataset.step);
+    if (n === 1 || state.zip) { if (n <= 2 || validateIdentity()) go(n); }
+  }));
+
+  // ---------- step 1: zip ----------
+  const drop = $('#drop'), zipInput = $('#zip');
+  drop.addEventListener('click', () => zipInput.click());
+  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', (e) => setZip(e.dataTransfer.files[0]));
+  zipInput.addEventListener('change', () => setZip(zipInput.files[0]));
+  $('#clearZip').addEventListener('click', () => setZip(null));
+  function setZip(file) {
+    if (file && !/\.zip$/i.test(file.name)) { toast('Please choose a .zip file'); return; }
+    state.zip = file || null;
+    $('#filePill').classList.toggle('show', !!file);
+    $('#to2').disabled = !file;
+    if (file) {
+      $('#fileName').textContent = file.name;
+      $('#fileSize').textContent = fmtBytes(file.size);
+      if (!$('#appName').value) {
+        const guess = file.name.replace(/\.zip$/i, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        $('#appName').value = guess.slice(0, 60);
+        updateNameHints();
+      }
+    } else zipInput.value = '';
+  }
+  $('#to2').addEventListener('click', () => go(2));
+
+  // ---------- step 2: identity ----------
+  const appName = $('#appName');
+  function updateNameHints() {
+    const v = appName.value.trim();
+    $('#phoneLabel').textContent = v || 'App name';
+    const ver = $('#versionName').value.trim();
+    $('#apkNameHint').innerHTML = `APK will be named <code>${slug(v)}${ver ? '-v' + slug(ver) : ''}-${state.variant}.apk</code>`;
+  }
+  appName.addEventListener('input', updateNameHints);
+  $('#versionName').addEventListener('input', updateNameHints);
+  $('#pickIcon').addEventListener('click', () => $('#icon').click());
+  $('#icon').addEventListener('change', () => setIcon($('#icon').files[0]));
+  $('#clearIcon').addEventListener('click', () => setIcon(null));
+  function setIcon(file) {
+    if (state.iconUrl) URL.revokeObjectURL(state.iconUrl);
+    state.icon = file || null;
+    state.iconUrl = file ? URL.createObjectURL(file) : null;
+    $('#iconPreview').innerHTML = file ? `<img src="${state.iconUrl}" alt="icon">` : 'No icon<br />(project default kept)';
+    $('#phoneIco').innerHTML = file ? `<img src="${state.iconUrl}" alt="">` : '';
+    $('#clearIcon').style.display = file ? '' : 'none';
+    if (!file) $('#icon').value = '';
+  }
+  function validateIdentity() {
+    let ok = true;
+    const name = appName.value.trim();
+    appName.classList.toggle('bad', !name);
+    if (!name) { toast('App name is required'); ok = false; }
+    const pkg = $('#packageName').value.trim();
+    const pkgOk = !pkg || /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(pkg);
+    $('#packageName').classList.toggle('bad', !pkgOk);
+    if (!pkgOk) { toast('Package name must look like com.example.app'); ok = false; }
+    const vc = $('#versionCode').value.trim();
+    const vcOk = !vc || (/^\d+$/.test(vc) && Number(vc) >= 1);
+    $('#versionCode').classList.toggle('bad', !vcOk);
+    if (!vcOk) { toast('Version code must be a positive whole number'); ok = false; }
+    return ok;
+  }
+  $('#to3').addEventListener('click', () => { if (validateIdentity()) go(3); });
+
+  // ---------- step 3: permissions ----------
+  const PRESETS = [
+    { label: '🌐 Basic network', keys: ['INTERNET', 'ACCESS_NETWORK_STATE'] },
+    { label: '📷 Camera + mic', keys: ['CAMERA', 'RECORD_AUDIO'] },
+    { label: '🔔 Notifications', keys: ['POST_NOTIFICATIONS', 'VIBRATE'] },
+    { label: '🖼 Gallery / storage', keys: ['READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE'] },
+    { label: '📍 Location', keys: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION'] },
+    { label: '📡 Bluetooth', keys: ['BLUETOOTH_CONNECT', 'BLUETOOTH_SCAN', 'BLUETOOTH', 'BLUETOOTH_ADMIN'] },
+    { label: '📞 Phone & SMS', keys: ['READ_PHONE_STATE', 'CALL_PHONE', 'SEND_SMS', 'RECEIVE_SMS', 'READ_SMS'] },
+    { label: '👥 Contacts & calendar', keys: ['READ_CONTACTS', 'WRITE_CONTACTS', 'READ_CALENDAR', 'WRITE_CALENDAR'] },
+  ];
+
+  async function loadPermissions() {
+    const res = await fetch('/api/permissions');
+    state.catalog = await res.json();
+    const presets = $('#presets');
+    presets.innerHTML = '';
+    for (const p of PRESETS) {
+      const b = document.createElement('button');
+      b.className = 'preset'; b.textContent = p.label;
+      b.addEventListener('click', () => { p.keys.forEach((k) => state.perms.add(k)); renderPerms(); });
+      presets.appendChild(b);
+    }
+    renderPerms();
+  }
+
+  function renderPerms() {
+    const q = $('#permSearch').value.trim().toLowerCase();
+    const groups = new Map();
+    for (const p of state.catalog) {
+      if (q && !`${p.key} ${p.label} ${p.detail} ${p.group} ${p.name}`.toLowerCase().includes(q)) continue;
+      if (!groups.has(p.group)) groups.set(p.group, []);
+      groups.get(p.group).push(p);
+    }
+    const container = $('#groups');
+    const collapsedBefore = new Set($$('.group.collapsed').map((g) => g.dataset.group));
+    container.innerHTML = '';
+    for (const [group, items] of groups) {
+      const on = items.filter((p) => state.perms.has(p.key)).length;
+      const g = document.createElement('div');
+      g.className = 'group' + (collapsedBefore.has(group) && !q ? ' collapsed' : '');
+      g.dataset.group = group;
+      g.innerHTML = `
+        <div class="group-h">
+          <div><h3 style="display:inline">${group}</h3><span class="cnt">${on}/${items.length} selected</span></div>
+          <div class="right">
+            <button class="btn sm ghost" data-act="all">Select all</button>
+            <button class="btn sm ghost" data-act="none">None</button>
+            <span class="cnt">▾</span>
+          </div>
+        </div>
+        <div class="group-body">
+          ${items.map((p) => `
+            <label class="perm ${state.perms.has(p.key) ? 'on' : ''}" data-key="${p.key}">
+              <input type="checkbox" ${state.perms.has(p.key) ? 'checked' : ''} />
+              <div>
+                <div class="t">${p.label}${p.dangerous ? '<span class="badge">runtime</span>' : ''}</div>
+                <div class="d">${p.detail}</div>
+                <div class="k">${p.name}</div>
+              </div>
+            </label>`).join('')}
+        </div>`;
+      g.querySelector('.group-h').addEventListener('click', (e) => {
+        const act = e.target.dataset.act;
+        if (act === 'all') { items.forEach((p) => state.perms.add(p.key)); renderPerms(); return; }
+        if (act === 'none') { items.forEach((p) => state.perms.delete(p.key)); renderPerms(); return; }
+        g.classList.toggle('collapsed');
+      });
+      g.querySelectorAll('.perm input').forEach((cb) => cb.addEventListener('change', () => {
+        const key = cb.closest('.perm').dataset.key;
+        cb.checked ? state.perms.add(key) : state.perms.delete(key);
+        renderPerms();
+      }));
+      container.appendChild(g);
+    }
+    if (!groups.size) container.innerHTML = '<div class="empty">No permissions match your search.</div>';
+    const bar = $('#selectedBar');
+    bar.innerHTML = state.perms.size
+      ? `<span class="hint" style="margin:0 6px 0 0">${state.perms.size} selected:</span>` +
+        [...state.perms].map((k) => `<span class="tag">${k}<button data-k="${k}" title="remove">×</button></span>`).join('')
+      : '<span class="hint">No permissions selected — the project\'s existing manifest permissions are kept.</span>';
+    bar.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { state.perms.delete(b.dataset.k); renderPerms(); }));
+  }
+  $('#permSearch').addEventListener('input', renderPerms);
+  $('#expandAll').addEventListener('click', () => $$('.group').forEach((g) => g.classList.remove('collapsed')));
+  $('#collapseAll').addEventListener('click', () => $$('.group').forEach((g) => g.classList.add('collapsed')));
+  $('#clearPerms').addEventListener('click', () => { state.perms.clear(); renderPerms(); });
+  $('#to4').addEventListener('click', () => go(4));
+
+  // ---------- step 4: build ----------
+  $('#variant').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.variant = b.dataset.v;
+    $$('#variant button').forEach((x) => x.classList.toggle('on', x === b));
+    $('#variantHint').textContent = state.variant === 'debug'
+      ? 'Debug is signed automatically and installs on any device.'
+      : 'Release uses the signingConfig in your build.gradle; without one the APK is unsigned.';
+    updateNameHints(); renderSummary();
+  });
+
+  function renderSummary() {
+    const ver = $('#versionName').value.trim();
+    const items = [
+      ['Project zip', state.zip ? `${state.zip.name} (${fmtBytes(state.zip.size)})` : '—'],
+      ['App name', appName.value.trim() || '—'],
+      ['APK file', `${slug(appName.value.trim())}${ver ? '-v' + slug(ver) : ''}-${state.variant}.apk`],
+      ['Package', $('#packageName').value.trim() || 'keep project value'],
+      ['Version', [ver, $('#versionCode').value.trim() && `(code ${$('#versionCode').value.trim()})`].filter(Boolean).join(' ') || 'keep project value'],
+      ['Icon', state.icon ? state.icon.name : 'keep project icon'],
+      ['Permissions', state.perms.size ? [...state.perms].join(', ') : 'none added'],
+    ];
+    $('#summary').innerHTML = items.map(([k, v]) => `<div><span>${k}</span>${v}</div>`).join('');
+  }
+
+  $('#buildBtn').addEventListener('click', async () => {
+    if (!state.zip) { toast('Upload a project zip first'); go(1); return; }
+    if (!validateIdentity()) { go(2); return; }
+    const fd = new FormData();
+    fd.append('project', state.zip);
+    if (state.icon) fd.append('icon', state.icon);
+    fd.append('appName', appName.value.trim());
+    fd.append('packageName', $('#packageName').value.trim());
+    fd.append('versionName', $('#versionName').value.trim());
+    fd.append('versionCode', $('#versionCode').value.trim());
+    fd.append('variant', state.variant);
+    fd.append('permissions', JSON.stringify([...state.perms]));
+    $('#buildBtn').disabled = true; $('#buildBtn').textContent = 'Uploading…';
+    try {
+      const res = await fetch('/api/builds', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      watch(data.id);
+    } catch (err) {
+      toast(err.message);
+      $('#buildBtn').disabled = false; $('#buildBtn').textContent = '🚀 Build APK';
+    }
+  });
+
+  const STAGES = { queued: 5, extracting: 15, validating: 25, preparing: 35, building: 60, success: 100, failed: 100 };
+  function watch(id) {
+    if (state.es) state.es.close();
+    clearInterval(state.timer);
+    state.currentBuild = id;
+    $('#buildArea').style.display = '';
+    $('#log').innerHTML = ''; $('#result').innerHTML = '';
+    $('#buildBtn').disabled = true; $('#buildBtn').textContent = 'Building…';
+    const start = Date.now();
+    state.timer = setInterval(() => { $('#elapsed').textContent = `${Math.round((Date.now() - start) / 1000)}s elapsed`; }, 1000);
+    setStatus('queued');
+    const log = $('#log');
+    const es = new EventSource(`/api/builds/${id}/logs`);
+    state.es = es;
+    es.onmessage = (e) => {
+      const line = JSON.parse(e.data);
+      if (line.startsWith('__status__:')) {
+        const st = line.slice(11);
+        setStatus(st);
+        if (st === 'success' || st === 'failed') { es.close(); clearInterval(state.timer); finish(id); }
+        return;
+      }
+      const span = document.createElement('span');
+      span.className = /^fix:/.test(line) ? 'fix' : /^warning:|^w: |WARNING/.test(line) ? 'warn' : /^error:|FAILED|Exception|What went wrong/.test(line) ? 'err' : '';
+      span.textContent = line + '\n';
+      log.appendChild(span);
+      if (log.childElementCount > 3000) log.removeChild(log.firstChild);
+      log.scrollTop = log.scrollHeight;
+    };
+    es.onerror = () => { /* server closes stream on completion */ };
+  }
+  function setStatus(st) {
+    const pill = $('#statusPill');
+    pill.textContent = st;
+    pill.className = 'pill ' + (st === 'success' ? 'success' : st === 'failed' ? 'failed' : 'running');
+    const prog = $('#progress');
+    prog.classList.toggle('indet', st === 'building');
+    prog.querySelector('i').style.width = (STAGES[st] || 10) + '%';
+  }
+  async function finish(id) {
+    const b = await (await fetch(`/api/builds/${id}`)).json();
+    $('#buildBtn').disabled = false; $('#buildBtn').textContent = '🚀 Build again';
+    const r = $('#result');
+    if (b.status === 'success') {
+      r.innerHTML = `<div class="result"><h3>✅ APK ready — ${b.identity?.appName || b.name}</h3>
+        <div class="hint">Built in ${b.durationSeconds}s · ${b.fixes.length} auto-fix(es) · ${b.identity?.permissions?.length || 0} permission(s) · ${b.identity?.hasIcon ? 'custom icon' : 'project icon'}</div>
+        ${b.apks.map((a) => `<div class="dl"><code>${a.file}</code><span class="hint">${fmtBytes(a.size)}</span><a class="btn primary sm" href="/api/builds/${id}/apk?file=${encodeURIComponent(a.file)}" download>⬇ Download</a></div>`).join('')}
+      </div>`;
+    } else {
+      r.innerHTML = `<div class="result bad"><h3>❌ Build failed</h3><div>${b.error || 'Unknown error'}</div>
+        <div class="hint" style="margin-top:6px">Search the log above for "What went wrong". Common causes: wrong compileSdk, missing dependency, Kotlin/AGP version mismatch.</div></div>`;
+    }
+    loadHistory();
+  }
+
+  // ---------- sidebar ----------
+  async function loadToolchain() {
+    try {
+      const t = await (await fetch('/api/health')).json();
+      $('#limit').textContent = `Max zip size: ${t.maxZipMb} MB`;
+      const ok = t.sdkInstalled && t.buildTools.length;
+      $('#toolchain').innerHTML = `
+        <span class="chip"><span class="dot ${ok ? '' : 'bad'}"></span> SDK <b>${ok ? 'ready' : 'missing'}</b></span>
+        <span class="chip">platforms <b>${t.platforms.map((p) => p.replace('android-', '')).join(', ') || '—'}</b></span>
+        <span class="chip">build-tools <b>${t.buildTools.join(', ') || '—'}</b></span>`;
+      $('#tcDetail').innerHTML = [
+        ['SDK root', t.sdk], ['Java', t.java || 'not found'], ['Gradle (fallback)', t.gradle || 'not found'],
+        ['Platforms', t.platforms.join(', ') || '—'], ['Build tools', t.buildTools.join(', ') || '—'],
+      ].map(([k, v]) => `<div><span>${k}</span><b title="${v}">${v}</b></div>`).join('');
+    } catch {
+      $('#toolchain').innerHTML = '<span class="chip"><span class="dot bad"></span> server unreachable</span>';
+    }
+  }
+  async function loadHistory() {
+    const list = await (await fetch('/api/builds')).json();
+    const ul = $('#hist');
+    if (!list.length) { ul.innerHTML = '<li class="empty">No builds yet</li>'; return; }
+    ul.innerHTML = list.slice(0, 30).map((b) => `
+      <li data-id="${b.id}">
+        <div class="row"><div class="name" title="${b.name}">${b.identity?.appName || b.name}</div><span class="pill ${b.status === 'success' ? 'success' : b.status === 'failed' ? 'failed' : 'running'}" style="padding:2px 8px;font-size:11px">${b.status}</span></div>
+        <div class="meta">${new Date(b.createdAt).toLocaleString()} · ${b.variant}${b.durationSeconds != null ? ` · ${b.durationSeconds}s` : ''}${b.apks.length ? ` · ${fmtBytes(b.apks[0].size)}` : ''}</div>
+      </li>`).join('');
+    ul.querySelectorAll('li[data-id]').forEach((li) => li.addEventListener('click', () => { go(4); watch(li.dataset.id); }));
+  }
+  $('#refreshHist').addEventListener('click', loadHistory);
+
+  loadToolchain(); loadPermissions(); loadHistory(); updateNameHints();
+})();
+</script>
+</body>
+</html>

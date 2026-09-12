@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: apk-builder
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: WORK_ROOT
+        value: /data
+      - key: MAX_ZIP_MB
+        value: "500"
+      - key: BUILD_TIMEOUT_MS
+        value: "1200000"
+    disk:
+      name: apk-builder-data
+      mountPath: /data
+      sizeGB: 20
