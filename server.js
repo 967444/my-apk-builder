@@ -5,8 +5,8 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
-const { startBuild, getBuild, listBuilds, loadPersisted, publicView, ANDROID_SDK_ROOT } = require('./src/builder');
-const { PERMISSIONS, resolvePermissions } = require('./src/permissions');
+const { startBuild, getBuild, listBuilds, loadPersisted, publicView, ANDROID_SDK_ROOT } = require('./builder');
+const { PERMISSIONS, resolvePermissions } = require('./permissions');
 
 const PORT = Number(process.env.PORT || 3000);
 const WORK_ROOT = process.env.WORK_ROOT || path.join(os.tmpdir(), 'apk-builder');
