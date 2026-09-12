@@ -187,20 +187,20 @@ async function execute(build) {
     const task = validation.appModule
       ? `:${validation.appModule}:assemble${variant === 'release' ? 'Release' : 'Debug'}`
       : `assemble${variant === 'release' ? 'Release' : 'Debug'}`;
-    const code = await run(
+        const code = await run(
       build,
       useWrapper ? './gradlew' : 'gradle',
-        [
+      [
         task,
         '--no-daemon',
-        '--max-workers=1',
-        '-Dorg.gradle.jvmargs=-Xmx384m -XX:+UseSerialGC',
+        '--max-workers=2',
+        '-Dorg.gradle.jvmargs=-Xmx2048m',
         '--init-script',
         MIRROR_INIT_SCRIPT,
         '-Dorg.gradle.internal.repository.max.retries=10',
         '-Dorg.gradle.internal.repository.initial.backoff=3000',
       ],
-            validation.root
+      validation.root
     );
     if (code !== 0) throw new Error(`Gradle exited with code ${code}. Check the log above for "What went wrong".`);
 
